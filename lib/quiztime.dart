@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:async';
+import 'package:http/http.dart' as http;
+import 'dart:convert' as convert;
+import 'package:encrypted_shared_preferences/encrypted_shared_preferences.dart';
+
+const String _baseURL = 'https://husseinmohamad.000webhostapp.com';
+final EncryptedSharedPreferences _encryptedData = EncryptedSharedPreferences();
+
 class quiztime extends StatefulWidget {
   final String calculationType;
   quiztime({Key? key, required this.calculationType}) : super(key: key);
@@ -23,7 +30,7 @@ class _quiztimeState extends State<quiztime> {
   List<double> answers=[];
   String quiztitle='';
   int decimal=0;
-
+  int timeTook = 0;
 
   @override
   void initState(){
@@ -34,7 +41,9 @@ class _quiztimeState extends State<quiztime> {
   }
   void timeout() {
     timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+
       setState(() {
+        timeTook++;
         if (timing > 0) {
           timing--;
           switch (timing){
@@ -67,12 +76,14 @@ class _quiztimeState extends State<quiztime> {
     resetTimer();
     timer.cancel();
     if(life==0){
+      dataInsertion(saveRecords, quiztitle, '0', timeTook.toString());
       timer.cancel();
       hearts = '💔💔💔';
       showRestartDialog();
       return;
     }
     if(counter==10){
+      dataInsertion(saveRecords, quiztitle, '1', timeTook.toString());
       timer.cancel();
       showWinDialog();
       return;
@@ -133,7 +144,9 @@ void resetTimer(){
       clock='🕛';
     });
 }
-
+  void saveRecords(String text){
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
   void showRestartDialog(){
     showDialog(context: context, builder: (BuildContext context){
       return AlertDialog(
@@ -142,6 +155,7 @@ void resetTimer(){
         actions: [
           ElevatedButton(onPressed: (){
             setState(() {
+              timeTook = 0;
               hearts='❤️❤️❤️';
               life = 3;
               counter = 0;
@@ -171,6 +185,7 @@ void resetTimer(){
         actions: [
           ElevatedButton(onPressed: (){
             setState(() {
+              timeTook = 0;
               life = 3;
               hearts='❤️❤️❤️';
               counter = 0;
@@ -209,7 +224,8 @@ void resetTimer(){
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('MyQuiz - $quiztitle'),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text('MyQuiz - $quiztitle',style: TextStyle(color: Colors.white),),
         centerTitle: true,
         backgroundColor: Colors.black,
       ),
@@ -261,8 +277,8 @@ void resetTimer(){
                       timer.cancel();
                       checkResult(answers[0]);
                     },
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                      child: Text(answers[0].toStringAsFixed(decimal), style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w300),),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0),),),
+                      child: Text(answers[0].toStringAsFixed(decimal), style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w300,color: Colors.white),),
                     )
                 ),
                 SizedBox(height: 100,width: 120,
@@ -270,8 +286,8 @@ void resetTimer(){
                       timer.cancel();
                       checkResult(answers[1]);
                     },
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                      child: Text(answers[1].toStringAsFixed(decimal), style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w300)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0),),),
+                      child: Text(answers[1].toStringAsFixed(decimal), style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w300,color: Colors.white)),
                     )
                 ),
               ],
@@ -285,8 +301,8 @@ void resetTimer(){
                       timer.cancel();
                       checkResult(answers[2]);
                     },
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                      child: Text(answers[2].toStringAsFixed(decimal), style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w300)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0),),),
+                      child: Text(answers[2].toStringAsFixed(decimal), style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w300,color: Colors.white)),
                     )
                 ),
                 SizedBox(height: 100,width: 120,
@@ -294,8 +310,8 @@ void resetTimer(){
                       timer.cancel();
                       checkResult(answers[3]);
                     },
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                      child: Text(answers[3].toStringAsFixed(decimal), style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w300)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0),),),
+                      child: Text(answers[3].toStringAsFixed(decimal), style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w300,color: Colors.white)),
                     )
                 ),
               ],
@@ -309,4 +325,27 @@ void resetTimer(){
     );
   }
 }
-
+void dataInsertion(Function(String text) saveRecords, String operation, String result,String tt) async{
+  try{
+    String userID = await _encryptedData.getString('myKey');
+    final response = await http.post(
+        Uri.parse('$_baseURL/datainsertion.php'),
+        headers: <String, String>{
+          'Content-Type' : 'application/json; charset=UTF-8',
+        },
+        body: convert.jsonEncode(<String, String>{
+          'uid': userID,
+          'operation': operation,
+          'result': result,
+          'timetook': tt
+        }))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      saveRecords(response.body);
+      print(response.body);
+    }
+  }catch(e){
+    saveRecords('connection error');
+    print(e);
+  }
+}
